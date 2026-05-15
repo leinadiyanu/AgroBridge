@@ -212,6 +212,8 @@ This pattern keeps development velocity high while maintaining the flexibility t
 ## Author
 
 **Daniel Akande**
+**Ochulor Johnpaul**
+**Ibeh Christogonous**
 
 ---
 
