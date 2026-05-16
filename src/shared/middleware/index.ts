@@ -1,6 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
-
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  // TODO: implement real auth
-  next();
-}
+export * from "./logger.js";
+// export * from "./auth.js";
+export * from "./errorHandler.js";

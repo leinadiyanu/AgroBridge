@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class UssdRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createSession(session: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return session;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

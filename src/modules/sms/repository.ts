@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class SmsRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createMessage(message: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return message;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

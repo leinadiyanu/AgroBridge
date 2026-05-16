@@ -1,9 +1,10 @@
+import "dotenv/config";
 import app from './app.js';
 import config from './config/index.js';
+// import {connectDB} from './shared/database.js';
 
-const port = Number(config.port) || 3000;
+const port = Number(config.port);
 
 app.listen(port, () => {
-  // eslint-disable-next-line no-console
   console.log(`Server listening on port ${port}`);
 });

@@ -1,4 +1,4 @@
-// export class AuthRepository {
+// export class UsersRepository {
 //   constructor(private db: any) {}
 
 //   async createUser(user: any) {
@@ -6,7 +6,7 @@
 //     return user;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

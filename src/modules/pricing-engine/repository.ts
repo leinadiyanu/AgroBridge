@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class PricingEngineRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createPrice(price: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return price;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

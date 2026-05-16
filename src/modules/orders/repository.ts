@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class OrdersRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createOrder(order: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return order;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

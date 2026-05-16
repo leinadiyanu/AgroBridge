@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class LogisticsRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createShipment(shipment: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return shipment;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }

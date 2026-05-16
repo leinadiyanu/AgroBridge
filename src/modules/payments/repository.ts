@@ -1,12 +1,12 @@
-// export class AuthRepository {
+// export class PaymentsRepository {
 //   constructor(private db: any) {}
 
-//   async createUser(user: any) {
+//   async createPayment(payment: any) {
 //     // TODO: implement DB insert
-//     return user;
+//     return payment;
 //   }
 
-//   async findByEmail(email: string) {
+//   async findById(id: string) {
 //     // TODO: implement DB query
 //     return null;
 //   }
