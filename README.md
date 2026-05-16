@@ -34,24 +34,24 @@ AgroBridge bridges the gap between Nigerian farmers and buyers by supporting bot
 ## Project Structure
 
 ```
-AgroBridge/
-├── src/
-│   ├── modules/
-│   │   ├── auth/
-│   │   ├── users/
-│   │   ├── products/
-│   │   ├── orders/
-│   │   └── payments/
-│   ├── config/
-│   ├── middleware/
-│   ├── utils/
-│   ├── app.ts
-│   └── server.ts
-├── dist/
-├── package.json
-├── tsconfig.json
-└── .env
-```
+AgroBridge
+├── prisma
+├── src
+│   ├── config
+│   ├── generated
+│   ├── modules
+│   │   ├── auth
+│   │   ├── logistics
+│   │   ├── market
+│   │   ├── orders
+│   │   ├── payments
+│   │   ├── pricing-engine
+│   │   ├── sms
+│   │   ├── users
+│   │   └── ussd
+│   └── shared
+│       └── middleware
+└── node_modules```
 
 Each module follows a consistent internal structure: `routes`, `controller`, `service`, and `validators`, keeping business logic separated from HTTP handling.
 
