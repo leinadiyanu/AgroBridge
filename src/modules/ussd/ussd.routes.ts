@@ -1,12 +1,16 @@
-// import { Router } from 'express';
-// import { UssdController } from './controller';
+import { Router } from "express";
+import { UssdController } from "./controller.js";
 
-// export function ussdRoutes() {
-//   const router = Router();
-//   const controller = new UssdController(null as any);
+const router = Router();
+const controller = new UssdController();
 
-//   router.post('/session', (req, res) => controller.handleSession(req, res));
-//   router.get('/session/:id', (req, res) => controller.getSession(req, res));
+/** Controller → Service → Repository → Route
+ * 
+ * USSD entry point
+ * Africa's Talking sends all USSD requests to this endpoint
+ * Handles session-based navigation using POST requests
+ */
 
-//   return router;
-// }
+router.post("/", controller.handleUssd);
+
+export default router;
