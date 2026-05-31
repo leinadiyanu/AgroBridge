@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  // output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -15,15 +14,24 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  FARMER
+  BUYER
+  AGENT
+  ADMIN 
+}
+
 model User {
-  id        String    @id @default(uuid())
-  name      String
-  email     String    @unique
-  role      String // farmer | buyer | admin
-  phone     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  listings  Listing[]
+  id          String    @id @default(uuid())
+  phoneNumber String    @unique
+  email       String?   @unique
+  name        String
+  location    String
+  role        Role
+  pin         String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  listings    Listing[]
 }
 
 model Listing {

@@ -21,6 +21,7 @@ export class UssdController {
     try {
       const { sessionId, phoneNumber, text } = req.body;
       console.log(req.body)
+      
       // Delegate logic to service layer
       const response = await this.ussd_service.processRequest({
         sessionId,
