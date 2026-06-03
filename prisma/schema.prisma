@@ -21,6 +21,27 @@ enum Role {
   ADMIN 
 }
 
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+  CANCELLED
+}
+
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id          String    @id @default(uuid())
   phoneNumber String    @unique
@@ -31,26 +52,116 @@ model User {
   pin         String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  listings    Listing[]
+
+  //Farmer Relations
+  listings          Listing[]       @relation("FarmerListings")
+  receivedOrders    Order[]         @relation("FarmerOrders")
+  farmerTransactions Transaction[]  @relation("FarmerTransactions")
+
+  // Buyer relations
+  placedOrders      Order[]         @relation("BuyerOrders")
+  buyerTransactions Transaction[]   @relation("BuyerTransactions")
+
+  // Agent relations
+  managedFarmers    AgentFarmer[]   @relation("AgentFarmers")
+  agentOf           AgentFarmer[]   @relation("FarmerAgent")
+  facilitatedTx     Transaction[]   @relation("AgentTransactions")
+
+  @@map("users")
 }
 
 model Listing {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  price       Float
-  quantity    Int
-  location    String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-}
+  id            String        @id @default(uuid())
+  crop          String
+  quantity      Int           //in kg
+  price         Float         //NGN per kg
+  location      String
+  availableFrom DateTime
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  farmer          User          @relation("FarmerListings", fields: [farmerId], references: [id])
+  farmerId        String
+
+  orders          Order[]
+
+  @@index([crop])
+  @@index([farmerId])
+  @@map("listings")
+  }
 
 model Order {
   id        String   @id @default(uuid())
+  quantity  Int       //kg requested
+  totalPrice Int      //quantity * listing.price at time of order
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  listing   Listing     @relation(fields: [listingId], references: [id])
   listingId String
+  
+  
+  buyer     User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   buyerId   String
-  quantity  Int
-  status    String // pending | paid | delivered
+
+  farmer    User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  farmerId  String
+
+  transaction Transaction?
+
+  @@index([buyerId])
+  @@index([farmerId])
+  @@map("orders")
+}
+
+model AgentFarmer {
+  id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+
+  agent     User     @relation("AgentFarmers", fields: [agentId], references: [id])
+  agentId   String
+
+  farmer    User     @relation("FarmerAgent", fields: [farmerId], references: [id])
+  farmerId  String
+
+  @@unique([agentId, farmerId]) // an agent can't add the same farmer twice
+  @@index([agentId])
+  @@map("agent_farmers")
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  amount    Int               // NGN
+  status    TransactionStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  agent     User              @relation("AgentTransactions", fields: [agentId], references: [id])
+  agentId   String
+
+  farmer    User              @relation("FarmerTransactions", fields: [farmerId], references: [id])
+  farmerId  String
+
+  buyer     User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  buyerId   String
+
+  order     Order?            @relation(fields: [orderId], references: [id])
+  orderId   String?           @unique // optional — not all transactions come from an order
+
+  @@index([agentId])
+  @@index([farmerId])
+  @@index([buyerId])
+  @@map("transactions")
+}
+
+model PriceRecord {
+  id        String   @id @default(cuid())
+  crop      String
+  price     Int      // NGN per kg
+  recordedAt DateTime @default(now())
+
+  @@index([crop])
+  @@map("price_records") // historical prices your ML model can train on
 }
