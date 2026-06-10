@@ -36,7 +36,7 @@ export class UssdController {
     } catch (error) {
       console.error("USSD Controller Error:", error);
 
-      // Always return END to terminate USSD session gracefully on error
+      //Return END to terminate USSD session gracefully on error
       res.set("Content-Type", "text/plain");
       res.send("END Something went wrong. Please try again later.");
     }

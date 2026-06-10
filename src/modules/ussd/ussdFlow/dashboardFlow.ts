@@ -248,6 +248,6 @@ export const dashboardFlowFor = (role: Role) => {
     [Role.FARMER]: farmerFlow,
     [Role.BUYER]:  buyerFlow,
     [Role.AGENT]:  agentFlow,
-  };
+  } as any;
   return map[role];
 };
