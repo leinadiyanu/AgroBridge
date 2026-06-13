@@ -1,5 +1,8 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
+import { AppError } from "./appError.js";
+import { verifyAccessToken } from "../utils/index.js";
+
 /**
  * Authentication Middleware
  *
@@ -13,31 +16,57 @@ import type { Request, Response, NextFunction } from "express";
  * Ensures only authenticated users can access protected resources.
  */
 
-export const auth = (req: Request, res: Response, next: NextFunction) => {
+// export const auth = (req: Request, res: Response, next: NextFunction) => {
     
-    try {
-        //Get authoriztion header
-        const authHeader = req.headers.authorization;
+//     try {
+//         //Get authoriztion header
+//         const authHeader = req.headers.authorization;
 
-        if (!authHeader) {
-            return res.status(401).json({ error: "No token provided." });
-        }
+//         if (!authHeader) {
+//             return res.status(401).json({ error: "No token provided." });
+//         }
 
-        //Extract token from header (format: "Bearer <token>")
-        const token = authHeader.split(" ")[1];
+//         //Extract token from header (format: "Bearer <token>")
+//         const token = authHeader.split(" ")[1];
 
-        if (!token) {
-            return res.status(401).json({ error: "No token provided." });
-        }   
+//         if (!token) {
+//             return res.status(401).json({ error: "No token provided." });
+//         }   
 
-        //Verify token and extract user data
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as jwt.JwtPayload;
+//         //Verify token and extract user data
+//         const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as jwt.JwtPayload;
 
 
-        // req.userId = decoded.userId;  // Now you have the user ID!
-        next();
+//         // req.userId = decoded.userId;  // Now you have the user ID!
+//         next();
 
-    } catch (error) {
-        res.status(401).json({ error: "Invalid token" });
+//     } catch (error) {
+//         res.status(401).json({ error: "Invalid token" });
+//     }
+// };
+
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return next(new AppError("Access token required", 401));
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return next(new AppError("Access token required", 401));
+  }
+
+  try {
+    const payload = verifyAccessToken(token);
+
+    (req as any).userId = payload.userId;
+    (req as any).role = payload.role;
+    next();
+  } catch (err: any) {
+    if (err.name === "TokenExpiredError") {
+      return next(new AppError("Access token expired", 401));
     }
+    return next(new AppError("Invalid access token", 401));
+  }
 };

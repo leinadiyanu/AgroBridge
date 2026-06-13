@@ -11,6 +11,6 @@
  */
 
 export * from "./formatDate.js";
-export * from "./generateToken.js";
+export * from "./tokenHandler.js";
 export * from "./hashPassword.js";
 export * from "./parseRole.js";

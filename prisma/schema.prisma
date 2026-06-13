@@ -43,15 +43,17 @@ enum TransactionStatus {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  phoneNumber String    @unique
-  email       String?   @unique
-  name        String
-  location    String
-  role        Role
-  pin         String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  phoneNumber   String    @unique
+  email         String?   @unique
+  name          String
+  location      String
+  role          Role
+  pin           String?
+  passwordHash  String?
+  refreshTokens RefreshToken[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   //Farmer Relations
   listings          Listing[]       @relation("FarmerListings")
@@ -68,6 +70,16 @@ model User {
   facilitatedTx     Transaction[]   @relation("AgentTransactions")
 
   @@map("users")
+}
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
 }
 
 model Listing {

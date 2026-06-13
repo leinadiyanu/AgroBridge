@@ -1,6 +1,7 @@
 import express from 'express';
 import {requestLogger, errorHandler, } from "./shared/middleware/index.js";
 import ussdRoutes from "./modules/ussd/ussd.routes.js";
+import authRoutes from "./modules/auth/authRoutes.js";
 import session from 'express-session';
 import { RedisStore } from 'connect-redis';
 import redisClient from './config/redis.js';
