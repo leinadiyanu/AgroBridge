@@ -55,17 +55,23 @@ export class AuthRepository {
     });
   }
 
+  async deleteUser(id: string) {
+    return prisma.user.delete({ where: { id } });
+  }
+
   // ── Pending registration (Redis) ─────────────────────────────────────────
 
   async savePendingRegistration(phoneNumber: string, data: CreateUserInput) {
     await redisClient.setEx(
       `pending:register:${phoneNumber}`,
       PENDING_TTL_SECONDS,
-      JSON.stringify(data)
+      JSON.stringify(data),
     );
   }
 
-  async getPendingRegistration(phoneNumber: string): Promise<CreateUserInput | null> {
+  async getPendingRegistration(
+    phoneNumber: string,
+  ): Promise<CreateUserInput | null> {
     const raw = await redisClient.get(`pending:register:${phoneNumber}`);
     if (!raw) return null;
     return JSON.parse(raw) as CreateUserInput;
@@ -93,11 +99,13 @@ export class AuthRepository {
     oldToken: string,
     userId: string,
     newToken: string,
-    expiresAt: Date
+    expiresAt: Date,
   ) {
     return prisma.$transaction([
       prisma.refreshToken.deleteMany({ where: { token: oldToken } }),
-      prisma.refreshToken.create({ data: { token: newToken, userId, expiresAt } }),
+      prisma.refreshToken.create({
+        data: { token: newToken, userId, expiresAt },
+      }),
     ]);
   }
 }

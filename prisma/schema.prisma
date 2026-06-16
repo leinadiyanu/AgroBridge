@@ -43,7 +43,7 @@ enum TransactionStatus {
 }
 
 model User {
-  id            String    @id @default(uuid())
+  id            String    @id @default(uuid()) //phoneNumber, name, location, role, passwordHash
   phoneNumber   String    @unique
   email         String?   @unique
   name          String

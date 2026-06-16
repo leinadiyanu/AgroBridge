@@ -6,11 +6,20 @@ export class AuthController {
 
   // ── Register ──────────────────────────────────────────────────────────────
 
-  registerInitiate = async (req: Request, res: Response, next: NextFunction) => {
+  registerInitiate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const { phoneNumber, email, name, location, role, password } = req.body;
       const result = await this.service.registerInitiate({
-        phoneNumber, email, name, location, role, password,
+        phoneNumber,
+        email,
+        name,
+        location,
+        role,
+        password,
       });
       res.status(200).json({ success: true, ...result });
     } catch (err) {
@@ -22,7 +31,10 @@ export class AuthController {
     try {
       const { phoneNumber, email, phoneOtp, emailOtp } = req.body;
       const result = await this.service.registerVerify({
-        phoneNumber, email, phoneOtp, emailOtp,
+        phoneNumber,
+        email,
+        phoneOtp,
+        emailOtp,
       });
       res.status(201).json({
         success: true,
@@ -39,7 +51,10 @@ export class AuthController {
   loginInitiate = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { phoneNumber, password } = req.body;
-      const result = await this.service.loginInitiate({ phoneNumber, password });
+      const result = await this.service.loginInitiate({
+        phoneNumber,
+        password,
+      });
       res.status(200).json({ success: true, ...result });
     } catch (err) {
       next(err);
@@ -64,13 +79,26 @@ export class AuthController {
 
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        res.status(400).json({ success: false, message: "Refresh token required" });
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res
+          .status(400)
+          .json({ success: false, message: "Refresh token required" });
         return;
       }
+
+      const refreshToken = authHeader.split(" ")[1];
+      if (!refreshToken) {
+        res
+          .status(400)
+          .json({ success: false, message: "Refresh token required" });
+        return;
+      }
+
       const tokens = await this.service.refresh(refreshToken);
-      res.status(200).json({ success: true, message: "Tokens refreshed", data: tokens });
+      res
+        .status(200)
+        .json({ success: true, message: "Tokens refreshed", data: tokens });
     } catch (err) {
       next(err);
     }
@@ -78,13 +106,27 @@ export class AuthController {
 
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        res.status(400).json({ success: false, message: "Refresh token required" });
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res
+          .status(400)
+          .json({ success: false, message: "Refresh token required" });
         return;
-      }
+      };
+
+      const refreshToken = authHeader.split(" ")[1];
+      if (!refreshToken) {
+        res
+          .status(400)
+          .json({ success: false, message: "Refresh token required" });
+        return;
+      };
+      
       await this.service.logout(refreshToken);
-      res.status(200).json({ success: true, message: "Logged out successfully" });
+      res
+        .status(200)
+        .json({ success: true, message: "Logged out successfully" });
     } catch (err) {
       next(err);
     }

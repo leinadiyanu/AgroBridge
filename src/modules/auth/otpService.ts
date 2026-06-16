@@ -2,7 +2,7 @@ import redisClient from "../../config/redis.js";
 import crypto from "crypto";
 
 
-const OTP_TTL_SECONDS = 10 * 60; // 10 minutes
+const OTP_TTL_SECONDS = 5 * 60; // 5 minutes
 
 const generateOtp = (): string =>
   crypto.randomInt(100000, 999999).toString();
@@ -23,9 +23,13 @@ export const verifyOtp = async (
   identifier: string,
   otp: string
 ): Promise<boolean> => {
-  const stored = await redisClient.get(otpKey(type, identifier));
+  const key = otpKey(type, identifier);
+  const stored = await redisClient.get(key);
+  
+  console.log('OTP DEBUG:', { key, stored, provided: otp });
+  
   if (!stored || stored !== otp) return false;
-  await redisClient.del(otpKey(type, identifier)); // one-time use
+  await redisClient.del(key);
   return true;
 };
 

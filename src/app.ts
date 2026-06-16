@@ -7,9 +7,6 @@ import { RedisStore } from 'connect-redis';
 import redisClient from './config/redis.js';
 
 
-// import { authRoutes } from './modules/auth/auth.routes.js';
-// import { usersRoutes } from './modules/users/users.routes.js';
-
 const app = express();
 
 app.use(express.json());
@@ -35,7 +32,7 @@ app.get('/', (req, res) => {
    });
 });
 
-// app.use('/auth', authRoutes());
+app.use('/auth', authRoutes);
 // app.use('/users', usersRoutes());
 app.use('/ussd', ussdRoutes);
 
