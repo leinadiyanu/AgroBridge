@@ -1,1 +1,0 @@
-{"version":3,"file":"service.d.ts","sourceRoot":"","sources":["../../../src/modules/ussd/service.ts"],"names":[],"mappings":"AAKA,qBAAa,WAAW;IACtB,OAAO,CAAC,IAAI,CAAwB;IACpC,OAAO,CAAC,MAAM,CAA6B;IACrC,cAAc,CAAC,EAAE,WAAW,EAAE,IAAI,EAAE,EAAE,GAAG;CA6DhD"}
