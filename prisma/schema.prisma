@@ -5,8 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -15,34 +14,168 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  FARMER
+  BUYER
+  AGENT
+  ADMIN 
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+  CANCELLED
+}
+
+enum ListingCategory {
+  PRODUCE
+  LIVESTOCK
+  INPUT
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 model User {
-  id        String    @id @default(uuid())
-  name      String
-  email     String    @unique
-  role      String // farmer | buyer | admin
-  phone     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  listings  Listing[]
+  id              String    @id @default(uuid()) //phoneNumber, name, location, role, passwordHash
+  phoneNumber     String    @unique
+  email           String?   @unique
+  name            String
+  location        String
+  role            Role
+  pin             String?
+  passwordHash    String?
+  farmSize        String?
+  deliveryAddress String?
+  coverageArea    String?
+  refreshTokens   RefreshToken[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  //Farmer Relations
+  listings          Listing[]       @relation("FarmerListings")
+  receivedOrders    Order[]         @relation("FarmerOrders")
+  farmerTransactions Transaction[]  @relation("FarmerTransactions")
+  // Buyer relations
+  placedOrders      Order[]         @relation("BuyerOrders")
+  buyerTransactions Transaction[]   @relation("BuyerTransactions")
+  // Agent relations
+  managedFarmers    AgentFarmer[]   @relation("AgentFarmers")
+  agentOf           AgentFarmer[]   @relation("FarmerAgent")
+  facilitatedTx     Transaction[]   @relation("AgentTransactions")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
 }
 
 model Listing {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  price       Float
-  quantity    Int
-  location    String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-}
+  id            String        @id @default(uuid())
+  crop          String
+  description   String?
+  quantity      Float           //in kg
+  price         Float         //NGN per kg
+  location      String
+  availableFrom DateTime
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  images        String[]  // array of image URLs
+  category      ListingCategory @default(PRODUCE)  // add this
+  unit          String          @default("kg")     // add this — livestock uses "head", fertilizer uses "bag"
+  farmer          User          @relation("FarmerListings", fields: [farmerId], references: [id])
+  farmerId        String
+  orders          Order[]
+
+  @@index([category])
+  @@index([crop])
+  @@index([farmerId])
+  @@map("listings")
+  }
 
 model Order {
-  id        String   @id @default(uuid())
+  id          String   @id @default(uuid())
+  quantity    Float       //kg requested
+  totalPrice  Float      //quantity * listing.price at time of order
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  listing   Listing     @relation(fields: [listingId], references: [id])
   listingId String
+  buyer     User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   buyerId   String
-  quantity  Int
-  status    String // pending | paid | delivered
+  farmer    User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  farmerId  String
+  transaction Transaction?
+
+  @@index([buyerId])
+  @@index([farmerId])
+  @@map("orders")
+}
+
+model AgentFarmer {
+  id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+  agent     User     @relation("AgentFarmers", fields: [agentId], references: [id])
+  agentId   String
+  farmer    User     @relation("FarmerAgent", fields: [farmerId], references: [id])
+  farmerId  String
+
+  @@unique([agentId, farmerId]) // an agent can't add the same farmer twice
+  @@index([agentId])
+  @@map("agent_farmers")
+}
+
+model Transaction {
+  id        String            @id @default(cuid())
+  amount    Int               // NGN
+  status    TransactionStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  agent     User?              @relation("AgentTransactions", fields: [agentId], references: [id])
+  agentId   String?
+  farmer    User              @relation("FarmerTransactions", fields: [farmerId], references: [id])
+  farmerId  String
+  buyer     User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  buyerId   String
+  order     Order?            @relation(fields: [orderId], references: [id])
+  orderId   String?           @unique // optional — not all transactions come from an order
+  paystackRef   String?  @unique  // Paystack payment reference
+  escrowRef     String?           // Pandascrow escrow reference
+  escrowStatus  String?           // held, released, disputed
+
+  @@index([agentId])
+  @@index([farmerId])
+  @@index([buyerId])
+  @@map("transactions")
+}
+
+model PriceRecord {
+  id           String   @id @default(cuid())
+  crop         String
+  price        Float
+  submittedBy  String?
+  recordedAt   DateTime @default(now())
+
+  @@index([crop])
+  @@map("price_records")
 }
