@@ -14,10 +14,13 @@ const options = {
       description: "Backend API for AgroBridge — connecting farmers, buyers and agents across Nigeria",
     },
     servers: [
-      {
-        url: "http://localhost:5000",
-        description: "Local development",
-      },
+  {
+    url: process.env.NODE_ENV === "production"
+      ? "https://your-app-name.onrender.com"
+      : "http://localhost:5000",
+    description: process.env.NODE_ENV === "production" ? "Production" : "Local development",
+  },
+],
     ],
     components: {
       securitySchemes: {
@@ -31,10 +34,10 @@ const options = {
     security: [{ bearerAuth: [] }],
   },
   apis: [
-    path.join(__dirname, "../modules/auth/routes.ts"),
-    path.join(__dirname, "../modules/listings/routes.ts"),
-    path.join(__dirname, "../modules/predictions/routes.ts"),
-    path.join(__dirname, "../modules/users/routes.ts"),
+    path.join(__dirname, "../modules/auth/routes.js"),
+    path.join(__dirname, "../modules/listings/routes.js"),
+    path.join(__dirname, "../modules/predictions/routes.js"),
+    path.join(__dirname, "../modules/users/routes.js"),
     // add more routes here as you build them
   ],
 };
