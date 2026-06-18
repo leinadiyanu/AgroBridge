@@ -1,5 +1,6 @@
 import { UssdRepository } from "../repository.js";
 import type { UssdSession } from "../repository.js";
+import { PredictionService } from "../../predictions/service.js";
 
 export class FlowEngine {
   constructor(private repo: UssdRepository) {}
@@ -60,21 +61,112 @@ export class FlowEngine {
 
     // ── PREDICT_PRICE ─────────────────────────────────────────────
     if (currentStep.action === "PREDICT_PRICE") {
-      const cropName = latestInput.trim().toLowerCase();
-      try {
-        const res = await fetch(
-          `${process.env.ML_SERVICE_URL}/predict?crop=${cropName}`
-        );
-        if (!res.ok) throw new Error("ML service error");
-        const { predicted_price, unit } = await res.json();
+      const parts = latestInput.split("|");
+      const commodity = parts[0]?.trim();
+      const state = parts[1]?.trim() ?? "Lagos";
+
+      if (!commodity) {
         await this.repo.deleteSession(phoneNumber);
-        return `END Price Prediction for ${latestInput}:\nEst. ${unit}: NGN ${predicted_price}\nBest time to sell: next 2 weeks`;
+        return "END Invalid input. Please try again.";
+      }
+      try {
+        const predictionService = new PredictionService();
+        const result = await predictionService.predict({
+          commodity: commodity.trim(),
+          state: state?.trim() ?? "Lagos",
+        });
+        await this.repo.deleteSession(phoneNumber);
+        return (
+          `END ${result.commodity} in ${result.state}\n` +
+          `Trend: ${result.direction}\n` +
+          `${result.advice}`
+        );
       } catch {
         await this.repo.deleteSession(phoneNumber);
-        return "END Could not fetch prediction. Try again later.";
+        return "END Price prediction unavailable. Try again later.";
       }
     }
 
+    // ── BEST_TIME ─────────────────────────────────────────────────
+    if (currentStep.action === "BEST_TIME") {
+      try {
+        const predictionService = new PredictionService();
+        const result = await predictionService.bestTime(latestInput.trim());
+        await this.repo.deleteSession(phoneNumber);
+        return (
+          `END Best time to sell ${result.commodity}:\n` +
+          `${result.best_month_to_sell}`
+        );
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not fetch best time. Try again later.";
+      }
+    }
+    // ── MY_INCOMING_ORDERS ────────────────────────────────────────
+    if (currentStep.action === "MY_INCOMING_ORDERS") {
+      try {
+        const orders = await this.repo.getIncomingOrders(phoneNumber);
+        if (!orders.length) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END You have no incoming orders.";
+        }
+
+        const lines = orders
+          .slice(0, 3)
+          .map(
+            (o: any, i: number) =>
+              `${i + 1}. ${o.listing.crop} ${o.quantity}kg\n   Buyer: ${o.buyer.name}`,
+          )
+          .join("\n");
+        session.data.orderIds = orders
+          .slice(0, 3)
+          .map((o: any) => o.id)
+          .join(",") as string;
+
+        // session.data.orderIds = orders.slice(0, 3).map((o: any) => o.id);
+        session.step = "orderAction";
+        await this.repo.saveSession(phoneNumber, session);
+
+        return `CON Incoming Orders:\n${lines}\n\nSelect order number or 0 to go back`;
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not fetch orders. Try again.";
+      }
+    }
+
+    // ── CONFIRM_ORDER ─────────────────────────────────────────────
+    if (currentStep.action === "CONFIRM_ORDER") {
+      try {
+        const orderId = session.data.selectedOrderId;
+        if (!orderId) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END Session expired. Please try again.";
+        }
+        await this.repo.updateOrderStatus(orderId, "CONFIRMED");
+        await this.repo.deleteSession(phoneNumber);
+        return "END Order confirmed successfully.";
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not confirm order. Try again.";
+      }
+    }
+
+    // ── CANCEL_ORDER ──────────────────────────────────────────────
+    if (currentStep.action === "CANCEL_ORDER") {
+      try {
+        const orderId = session.data.selectedOrderId;
+        if (!orderId) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END Session expired. Please try again.";
+        }
+        await this.repo.updateOrderStatus(orderId, "CANCELLED");
+        await this.repo.deleteSession(phoneNumber);
+        return "END Order cancelled.";
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not cancel order. Try again.";
+      }
+    }
     // ── POST_PRODUCE ──────────────────────────────────────────────
     if (currentStep.action === "POST_PRODUCE") {
       const { postCrop, postQuantity, postPrice, postLocation } = session.data;
@@ -86,7 +178,7 @@ export class FlowEngine {
 
       const location =
         postLocation === "0"
-          ? session.data.profileLocation ?? session.data.location
+          ? (session.data.profileLocation ?? session.data.location)
           : postLocation;
 
       if (!location) {
@@ -111,11 +203,77 @@ export class FlowEngine {
       }
     }
 
+    // ── MY_LISTINGS ───────────────────────────────────────────────
+    if (currentStep.action === "MY_LISTINGS") {
+      try {
+        const listings = await this.repo.getListingsByPhone(phoneNumber);
+        if (!listings.length) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END You have no active listings.";
+        }
+
+        const lines = listings
+          .slice(0, 3)
+          .map(
+            (l: any, i: number) =>
+              `${i + 1}. ${l.crop} ${l.quantity}kg @${l.price}/kg`,
+          )
+          .join("\n");
+
+        // Save listing IDs in session for actions
+        
+        // session.data.listingIds = listings.slice(0, 3).map((l: any) => l.id);
+        session.data.listingIds = listings.slice(0, 3).map((l: any) => l.id).join(",") as string;
+        session.step = "listingAction";
+        await this.repo.saveSession(phoneNumber, session);
+
+        return `CON My Listings:\n${lines}\n\nSelect listing number or 0 to go back`;
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not fetch listings. Try again.";
+      }
+    }
+
+    // ── MARK_LISTING_SOLD ─────────────────────────────────────────
+    if (currentStep.action === "MARK_LISTING_SOLD") {
+      try {
+        const listingId = session.data.selectedListingId;
+
+        if (!listingId) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END Session expired. Please try again.";
+        }
+        await this.repo.updateListingStatus(listingId, "SOLD");
+        await this.repo.deleteSession(phoneNumber);
+        return "END Listing marked as sold successfully.";
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not update listing. Try again.";
+      }
+    }
+
+    // ── CANCEL_LISTING ────────────────────────────────────────────
+    if (currentStep.action === "CANCEL_LISTING") {
+      try {
+        const listingId = session.data.selectedListingId;
+        if (!listingId) {
+          await this.repo.deleteSession(phoneNumber);
+          return "END Session expired. Please try again.";
+        }
+        await this.repo.updateListingStatus(listingId, "CANCELLED");
+        await this.repo.deleteSession(phoneNumber);
+        return "END Listing cancelled successfully.";
+      } catch {
+        await this.repo.deleteSession(phoneNumber);
+        return "END Could not cancel listing. Try again.";
+      }
+    }
+
     // ── BROWSE_PRODUCE ────────────────────────────────────────────
     if (currentStep.action === "BROWSE_PRODUCE") {
       try {
         const listings: any[] = await this.repo.getListingsByCrop(
-          latestInput.trim()
+          latestInput.trim(),
         );
         await this.repo.deleteSession(phoneNumber);
 
@@ -127,7 +285,7 @@ export class FlowEngine {
           .slice(0, 3)
           .map(
             (l: any) =>
-              `${l.crop} ${l.quantity}kg @${l.price}/kg - ${l.location}`
+              `${l.crop} ${l.quantity}kg @${l.price}/kg - ${l.location}`,
           )
           .join("\n");
         return `END Results:\n${lines}`;
@@ -204,7 +362,11 @@ export class FlowEngine {
     }
 
     return typeof nextStep.prompt === "function"
-      ? nextStep.prompt(session.data.role, session.data.name, session.data.location)
+      ? nextStep.prompt(
+          session.data.role,
+          session.data.name,
+          session.data.location,
+        )
       : nextStep.prompt;
   }
 }

@@ -65,16 +65,48 @@ export class UssdRepository {
     // prisma.listing.create(...)
   }
 
- async getListingsByCrop(crop: string): Promise<any[]> {
-  return prisma.listing.findMany({
-    where: {
-      crop: { contains: crop, mode: "insensitive" },
-      status: "ACTIVE",
-    },
-    take: 3,
-    orderBy: { createdAt: "desc" },
-  });
-}
+  async getListingsByCrop(crop: string): Promise<any[]> {
+    return prisma.listing.findMany({
+      where: {
+        crop: { contains: crop, mode: "insensitive" },
+        status: "ACTIVE",
+      },
+      take: 3,
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async getListingsByPhone(phoneNumber: string) {
+    const user = await prisma.user.findUnique({ where: { phoneNumber } });
+    if (!user) return [];
+    return prisma.listing.findMany({
+      where: { farmerId: user.id, status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+  }
+
+  async updateListingStatus(id: string, status: "SOLD" | "CANCELLED") {
+    return prisma.listing.update({ where: { id }, data: { status } });
+  }
+
+  async getIncomingOrders(phoneNumber: string) {
+    const user = await prisma.user.findUnique({ where: { phoneNumber } });
+    if (!user) return [];
+    return prisma.order.findMany({
+      where: { farmerId: user.id, status: "PENDING" },
+      include: {
+        listing: { select: { crop: true } },
+        buyer: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+  }
+
+  async updateOrderStatus(id: string, status: "CONFIRMED" | "CANCELLED") {
+    return prisma.order.update({ where: { id }, data: { status } });
+  }
 
   async linkFarmerToAgent(data: { agentPhone: string; farmerPhone: string }) {
     // prisma.agentFarmer.create(...)

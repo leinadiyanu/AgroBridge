@@ -1,10 +1,15 @@
 import express from 'express';
 import {requestLogger, errorHandler, } from "./shared/middleware/index.js";
-import ussdRoutes from "./modules/ussd/ussd.routes.js";
-import authRoutes from "./modules/auth/authRoutes.js";
+import ussdRoutes from "./modules/ussd/routes.js";
+import authRoutes from "./modules/auth/routes.js";
+import usersRoutes from "./modules/users/routes.js";
+import listingRoutes from "./modules/listings/routes.js";
+import predictionRoutes from "./modules/predictions/routes.js";
 import session from 'express-session';
 import { RedisStore } from 'connect-redis';
 import redisClient from './config/redis.js';
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger.js";
 
 
 const app = express();
@@ -33,8 +38,12 @@ app.get('/', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
-// app.use('/users', usersRoutes());
+app.use('/users', usersRoutes);
 app.use('/ussd', ussdRoutes);
+app.use("/listings", listingRoutes);
+app.use("/predictions", predictionRoutes);
 
 app.use(errorHandler);
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 export default app;
