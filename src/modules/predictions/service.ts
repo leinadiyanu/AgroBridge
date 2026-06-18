@@ -23,12 +23,12 @@ export class PredictionService {
       take: 3,
     });
 
-    const prices = records.map((r) => r.price);
+    const prices = records.map((r: { price: number }) => r.price);
     const lag1 = prices[0] ?? 0;
     const lag3 = prices[2] ?? prices[0] ?? 0;
     const rolling_mean3 =
       prices.length > 0
-        ? prices.reduce((a, b) => a + b, 0) / prices.length
+       ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length
         : 0;
 
     return {
