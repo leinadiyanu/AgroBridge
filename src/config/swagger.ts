@@ -21,7 +21,6 @@ const options = {
     description: process.env.NODE_ENV === "production" ? "Production" : "Local development",
   },
 ],
-    ],
     components: {
       securitySchemes: {
         bearerAuth: {
