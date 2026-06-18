@@ -11,10 +11,12 @@ import type {
 const ML_BASE_URL = "https://agrobridge-api.onrender.com";
 
 export class PredictionService {
-
   // ── Build input from PriceRecord history ──────────────────────────────────
 
-  private async buildInput(commodity: string, state: string): Promise<PredictInput> {
+  private async buildInput(
+    commodity: string,
+    state: string,
+  ): Promise<PredictInput> {
     const now = new Date();
 
     const records = await prisma.priceRecord.findMany({
@@ -23,13 +25,11 @@ export class PredictionService {
       take: 3,
     });
 
-    const prices = records.map((r) => r.price);
+    const prices = records.map((r: { price: number }) => r.price);
     const lag1 = prices[0] ?? 0;
     const lag3 = prices[2] ?? prices[0] ?? 0;
     const rolling_mean3 =
-      prices.length > 0
-        ? prices.reduce((a, b) => a + b, 0) / prices.length
-        : 0;
+      prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
 
     return {
       commodity,
@@ -39,7 +39,7 @@ export class PredictionService {
       lag1,
       lag3,
       rolling_mean3,
-      min_dist_s: 160.25,  // update when geo data is available
+      min_dist_s: 160.25, // update when geo data is available
       mean_dist_s: 659.08, // update when geo data is available
     };
   }

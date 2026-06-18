@@ -52,6 +52,7 @@ router.use(authenticate);
  *         description: ML service unavailable
  */
 router.post("/predict", controller.predict);
+
 /**
  * @swagger
  * /predictions/best-time/{commodity}:
