@@ -1,3 +1,4 @@
+// src/services/email.service.ts — add general sendEmail
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
@@ -27,5 +28,16 @@ export const sendEmailOtp = async (email: string, otp: string) => {
         </p>
       </div>
     `,
+  });
+};
+
+export const sendEmail = async (options: {
+  to: string;
+  subject: string;
+  html: string;
+}) => {
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    ...options,
   });
 };

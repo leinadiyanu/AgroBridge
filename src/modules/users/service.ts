@@ -4,7 +4,11 @@ import { UserRepository } from "./repository.js";
 import type { UpdateProfileInput } from "./repository.js";
 import { AppError } from "../../shared/middleware/index.js";
 import { generateOtp, saveOtp, verifyOtp } from "../auth/otpService.js";
-import { sendSmsOtp } from "../auth/smsService.js";
+import { sendSmsOtp } from "../services/smsService.js";
+import { NotificationService } from "../notifications/service.js";
+import type { AddFarmerInput } from "./types.js";
+
+const notificationService = new NotificationService();
 
 interface ChangePasswordInput {
   oldPassword: string;
@@ -84,8 +88,16 @@ export class UserService {
       );
     }
 
+    if (data.newPassword.length < 8) {
+      throw new AppError("New password must be at least 8 characters", 400);
+    }
+
     const newHash = await bcrypt.hash(newPassword, 12);
     await this.repo.updatePassword(userId, newHash);
+
+    await notificationService.notify({ type: "password.changed", userId });
+
+    return { message: "Password changed successfully" };
   }
 
   // ── Change phone — step 1: send OTP to new number ─────────────────────────
@@ -160,5 +172,48 @@ export class UserService {
     }));
 
     return { ...result, agents };
+  }
+
+  async addFarmer(agentId: string, userRole: Role, data: AddFarmerInput) {
+    if (userRole !== Role.AGENT) {
+      throw new AppError("Only agents can add farmers", 403);
+    }
+
+    const farmer = await this.repo.findFarmerByPhone(data.farmerPhone);
+    if (!farmer) {
+      throw new AppError("No account found with this phone number", 404);
+    }
+    if (farmer.role !== Role.FARMER) {
+      throw new AppError("This phone number does not belong to a farmer", 400);
+    }
+
+    const existing = await this.repo.findExistingLink(agentId, farmer.id);
+    if (existing) {
+      throw new AppError("This farmer is already in your managed list", 409);
+    }
+
+    await this.repo.linkAgentFarmer(agentId, farmer.id);
+
+    await notificationService.notify({
+      type: "farmer.assigned",
+      farmerId: farmer.id,
+      agentId,
+    });
+
+    return {
+      farmer: {
+        id: farmer.id,
+        name: farmer.name,
+        phoneNumber: farmer.phoneNumber,
+      },
+    };
+  }
+
+  async getMyFarmers(agentId: string, userRole: Role) {
+    if (userRole !== Role.AGENT) {
+      throw new AppError("Only agents have managed farmers", 403);
+    }
+    const links = await this.repo.getManagedFarmers(agentId);
+    return links.map((l) => l.farmer);
   }
 }

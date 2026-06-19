@@ -47,6 +47,12 @@ enum TransactionStatus {
   FAILED
 }
 
+enum DeliveryMethod {
+  SELF_PICKUP
+  FARMER_DELIVERY
+  AGROBRIDGE_DELIVERY
+}
+
 model User {
   id              String    @id @default(uuid()) //phoneNumber, name, location, role, passwordHash
   phoneNumber     String    @unique
@@ -105,6 +111,7 @@ model Listing {
   farmer          User          @relation("FarmerListings", fields: [farmerId], references: [id])
   farmerId        String
   orders          Order[]
+  priceAlertEnabled Boolean @default(false)
 
   @@index([category])
   @@index([crop])
@@ -119,13 +126,17 @@ model Order {
   status      OrderStatus @default(PENDING)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  listing   Listing     @relation(fields: [listingId], references: [id])
-  listingId String
-  buyer     User        @relation("BuyerOrders", fields: [buyerId], references: [id])
-  buyerId   String
-  farmer    User        @relation("FarmerOrders", fields: [farmerId], references: [id])
-  farmerId  String
+  listing     Listing     @relation(fields: [listingId], references: [id])
+  listingId   String
+  buyer       User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  buyerId     String
+  farmer      User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  farmerId    String
   transaction Transaction?
+
+  deliveryMethod   DeliveryMethod @default(SELF_PICKUP)
+  deliveryDistance Float?         // in km
+  deliveryFee      Float          @default(0)
 
   @@index([buyerId])
   @@index([farmerId])
@@ -146,36 +157,28 @@ model AgentFarmer {
 }
 
 model Transaction {
-  id        String            @id @default(cuid())
-  amount    Int               // NGN
-  status    TransactionStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  agent     User?              @relation("AgentTransactions", fields: [agentId], references: [id])
-  agentId   String?
-  farmer    User              @relation("FarmerTransactions", fields: [farmerId], references: [id])
-  farmerId  String
-  buyer     User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
-  buyerId   String
-  order     Order?            @relation(fields: [orderId], references: [id])
-  orderId   String?           @unique // optional — not all transactions come from an order
-  paystackRef   String?  @unique  // Paystack payment reference
-  escrowRef     String?           // Pandascrow escrow reference
+  id            String            @id @default(cuid())
+  amount        Float             // total amount buyer pays
+  platformFee   Float             @default(0)  // AgroBridge's cut
+  farmerPayout  Float             @default(0)  // amount - platformFee
+  status        TransactionStatus @default(PENDING)
+  paystackRef   String?           @unique
+  escrowRef     String?
   escrowStatus  String?           // held, released, disputed
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  agent         User?             @relation("AgentTransactions", fields: [agentId], references: [id])
+  agentId       String?
+  farmer        User              @relation("FarmerTransactions", fields: [farmerId], references: [id])
+  farmerId      String
+  buyer         User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  buyerId       String
+  order         Order?            @relation(fields: [orderId], references: [id])
+  orderId       String?           @unique
 
   @@index([agentId])
   @@index([farmerId])
   @@index([buyerId])
   @@map("transactions")
-}
-
-model PriceRecord {
-  id           String   @id @default(cuid())
-  crop         String
-  price        Float
-  submittedBy  String?
-  recordedAt   DateTime @default(now())
-
-  @@index([crop])
-  @@map("price_records")
 }

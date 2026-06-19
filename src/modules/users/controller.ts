@@ -94,19 +94,25 @@ export class UserController {
 
   // ── Public profile ────────────────────────────────────────────────────────
 
-getPublicProfile = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = req.params.id as string;
-    if (!id) {
-      res.status(400).json({ success: false, message: "User ID is required" });
-      return;
+  getPublicProfile = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const id = req.params.id as string;
+      if (!id) {
+        res
+          .status(400)
+          .json({ success: false, message: "User ID is required" });
+        return;
+      }
+      const user = await this.service.getPublicProfile(id);
+      res.status(200).json({ success: true, data: { user } });
+    } catch (err) {
+      next(err);
     }
-    const user = await this.service.getPublicProfile(id);
-    res.status(200).json({ success: true, data: { user } });
-  } catch (err) {
-    next(err);
-  }
-};
+  };
 
   // ── Lists ─────────────────────────────────────────────────────────────────
 
@@ -127,6 +133,37 @@ getPublicProfile = async (req: Request, res: Response, next: NextFunction) => {
       const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
       const result = await this.service.listAgents(page, limit);
       res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  addFarmer = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.addFarmer(
+        req.user!.id,
+        req.user!.role,
+        req.body,
+      );
+      res
+        .status(201)
+        .json({
+          success: true,
+          message: "Farmer added successfully",
+          data: result,
+        });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getMyFarmers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const farmers = await this.service.getMyFarmers(
+        req.user!.id,
+        req.user!.role,
+      );
+      res.status(200).json({ success: true, data: farmers });
     } catch (err) {
       next(err);
     }

@@ -259,4 +259,46 @@ router.get("/agents", ctrl.listAgents);
  */
 router.get("/:id", ctrl.getPublicProfile);
 
+/**
+ * @swagger
+ * /users/me/farmers:
+ *   post:
+ *     summary: Add a farmer to managed list (agents only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [farmerPhone]
+ *             properties:
+ *               farmerPhone:
+ *                 type: string
+ *                 example: "+2348012345678"
+ *     responses:
+ *       201:
+ *         description: Farmer added successfully
+ *       403:
+ *         description: Only agents can add farmers
+ *       404:
+ *         description: No account found with this phone number
+ *       409:
+ *         description: This farmer is already in your managed list
+ *   get:
+ *     summary: View my managed farmers (agents only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of managed farmers
+ *       403:
+ *         description: Only agents have managed farmers
+ */
+router.post("/me/farmers", ctrl.addFarmer);
+router.get("/me/farmers", ctrl.getMyFarmers);
+
 export default router;

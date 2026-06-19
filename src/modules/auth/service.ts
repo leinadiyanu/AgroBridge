@@ -8,10 +8,12 @@ import {
   verifyRefreshToken,
 } from "../../shared/utils/tokenHandler.js";
 import { generateOtp, saveOtp, verifyOtp } from "./otpService.js";
-import { sendSmsOtp } from "./smsService.js";
-import { sendEmailOtp } from "./emailService.js";
+import { sendSmsOtp } from "../services/smsService.js";
+import { sendEmailOtp } from "../services/emailService.js";
+import { NotificationService } from "../notifications/service.js";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const notificationService = new NotificationService();
 
 interface RegisterInitiateInput {
   phoneNumber: string;
@@ -155,6 +157,9 @@ export class AuthService {
     );
 
     await this.repo.clearPendingRegistration(phoneNumber);
+
+    // After registerVerify creates user
+    await notificationService.notify({ type: "welcome", userId: user.id });
 
     return { user, accessToken, refreshToken };
   }

@@ -182,4 +182,40 @@ export class UserRepository {
   async clearPendingPhoneChange(userId: string) {
     await redisClient.del(`pending:phone-change:${userId}`);
   }
+
+  async findFarmerByPhone(phoneNumber: string) {
+    return prisma.user.findUnique({
+      where: { phoneNumber },
+    });
+  }
+
+  async linkAgentFarmer(agentId: string, farmerId: string) {
+    return prisma.agentFarmer.create({
+      data: { agentId, farmerId },
+    });
+  }
+
+  async findExistingLink(agentId: string, farmerId: string) {
+    return prisma.agentFarmer.findUnique({
+      where: { agentId_farmerId: { agentId, farmerId } },
+    });
+  }
+
+  async getManagedFarmers(agentId: string) {
+    return prisma.agentFarmer.findMany({
+      where: { agentId },
+      include: {
+        farmer: {
+          select: {
+            id: true,
+            name: true,
+            phoneNumber: true,
+            location: true,
+            farmSize: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 }
