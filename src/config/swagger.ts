@@ -38,12 +38,12 @@ const options = {
     security: [{ bearerAuth: [] }],
   },
   apis: [
-    path.join(__dirname, "../modules/auth/routes.ts"),
-    path.join(__dirname, "../modules/listings/routes.ts"),
-    path.join(__dirname, "../modules/orders/routes.ts"),
-    path.join(__dirname, "../modules/payments/routes.ts"),
-    path.join(__dirname, "../modules/predictions/routes.ts"),
-    path.join(__dirname, "../modules/users/routes.ts"),
+    path.join(__dirname, "../modules/auth/routes.js"),
+    path.join(__dirname, "../modules/listings/routes.js"),
+    path.join(__dirname, "../modules/orders/routes.js"),
+    path.join(__dirname, "../modules/payments/routes.js"),
+    path.join(__dirname, "../modules/predictions/routes.js"),
+    path.join(__dirname, "../modules/users/routes.js"),
     // add more routes here as you build them
   ],
 };
