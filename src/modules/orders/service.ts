@@ -1,4 +1,5 @@
 import { Role } from "@prisma/client";
+import { prisma } from "../../config/db.js";
 import { OrderRepository } from "./repository.js";
 import { ListingRepository } from "../listings/repository.js";
 import type { CreateOrderInput, OrderFilterInput } from "./types.js";
