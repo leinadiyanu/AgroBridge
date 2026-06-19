@@ -19,7 +19,7 @@ export class OrderRepository {
         quantity: data.quantity,
         totalPrice,
         deliveryMethod: data.deliveryMethod,
-        deliveryDistance,
+        deliveryDistance: deliveryDistance ?? null,
         deliveryFee,
         status: "PENDING",
       },
