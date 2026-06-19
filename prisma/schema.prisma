@@ -119,6 +119,19 @@ model Listing {
   @@map("listings")
   }
 
+model PriceRecord {
+  id        String   @id @default(uuid())
+  crop      String
+  price     Float
+  location  String?
+  source    String?  // e.g. "market", "manual", "scraped"
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([crop])
+  @@map("price_records")
+}
+
 model Order {
   id          String   @id @default(uuid())
   quantity    Float       //kg requested
