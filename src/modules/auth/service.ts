@@ -74,12 +74,25 @@ export class AuthService {
     const phoneOtp = generateOtp();
     const emailOtp = generateOtp();
 
-    // Phone is the primary, required channel.
-    const phoneResults = await Promise.allSettled([
+   // Phone and email OTP tasks run concurrently — neither waits on the other.
+    const phoneTasksPromise = Promise.allSettled([
       saveOtp("phone", phoneNumber, phoneOtp),
       sendSmsOtp(phoneNumber, phoneOtp),
     ]);
 
+    const emailTasksPromise = email
+      ? Promise.allSettled([
+          saveOtp("email", email, emailOtp),
+          sendEmailOtp(email, emailOtp),
+        ])
+      : Promise.resolve(null);
+
+    const [phoneResults, emailResults] = await Promise.all([
+      phoneTasksPromise,
+      emailTasksPromise,
+    ]);
+
+    // Phone is the primary, required channel.
     const phoneFailed = phoneResults.some((r) => r.status === "rejected");
     if (phoneFailed) {
       phoneResults.forEach((r, i) => {
@@ -92,12 +105,7 @@ export class AuthService {
 
     // Email is optional/secondary — a failure here must not block registration.
     let emailOtpRequired = false;
-    if (email) {
-      const emailResults = await Promise.allSettled([
-        saveOtp("email", email, emailOtp),
-        sendEmailOtp(email, emailOtp),
-      ]);
-
+    if (email && emailResults) {
       const emailFailed = emailResults.some((r) => r.status === "rejected");
       if (emailFailed) {
         emailResults.forEach((r, i) => {
