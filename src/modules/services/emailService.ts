@@ -8,6 +8,9 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_APP_PASSWORD as string,
   },
   family: 4,
+  connectionTimeout: 10000, // 10s to establish TCP connection
+  greetingTimeout: 10000,   // 10s to receive SMTP greeting after connecting
+  socketTimeout: 15000,     // 15s of socket inactivity before giving up
 } as any);
 
 export const sendEmailOtp = async (email: string, otp: string) => {
