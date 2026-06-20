@@ -5,9 +5,10 @@ const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.GMAIL_USER as string,
-    pass: process.env.GMAIL_APP_PASSWORD as string, // Gmail App Password, not your login password
+    pass: process.env.GMAIL_APP_PASSWORD as string,
   },
-});
+  family: 4,
+} as any);
 
 export const sendEmailOtp = async (email: string, otp: string) => {
   await transporter.sendMail({
