@@ -47,6 +47,7 @@ export class AuthService {
   // ── Register Step 1: validate + send OTPs ────────────────────────────────
 
   async registerInitiate(input: RegisterInitiateInput) {
+    const t0 = Date.now();
     const { phoneNumber, email, name, location, role, password } = input;
 
     if (password.length < 8) {
@@ -54,6 +55,8 @@ export class AuthService {
     }
 
     const existingByPhone = await this.repo.findByPhone(phoneNumber);
+    console.log(`[timing] findByPhone: ${Date.now() - t0}ms`);
+
     if (existingByPhone) {
       throw new AppError(
         "An account with this phone number already exists. Please log in.",
@@ -62,19 +65,22 @@ export class AuthService {
     }
 
     if (email) {
+      const t1 = Date.now();
       const existingByEmail = await this.repo.findByEmail(email);
+      console.log(`[timing] findByEmail: ${Date.now() - t1}ms`);
       if (existingByEmail) {
         throw new AppError("Email is already in use", 409);
       }
     }
 
+    const t2 = Date.now();
     const passwordHash = await bcrypt.hash(password, 12);
+    console.log(`[timing] bcrypt.hash: ${Date.now() - t2}ms`);
 
-    // Generate OTPs
     const phoneOtp = generateOtp();
     const emailOtp = generateOtp();
 
-   // Phone and email OTP tasks run concurrently — neither waits on the other.
+    const t3 = Date.now();
     const phoneTasksPromise = Promise.allSettled([
       saveOtp("phone", phoneNumber, phoneOtp),
       sendSmsOtp(phoneNumber, phoneOtp),
@@ -91,6 +97,7 @@ export class AuthService {
       phoneTasksPromise,
       emailTasksPromise,
     ]);
+    console.log(`[timing] OTP tasks total: ${Date.now() - t3}ms`);
 
     // Phone is the primary, required channel.
     const phoneFailed = phoneResults.some((r) => r.status === "rejected");
