@@ -80,6 +80,8 @@ export class AuthService {
     const phoneOtp = generateOtp();
     const emailOtp = generateOtp();
 
+    const t3 = Date.now(); 
+
     const phoneTasksPromise = Promise.allSettled([
       saveOtp("phone", phoneNumber, phoneOtp).then((r) => {
         console.log(`[timing] saveOtp phone done`);
