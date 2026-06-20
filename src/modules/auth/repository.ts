@@ -14,6 +14,12 @@ export interface CreateUserInput {
   passwordHash: string;
 }
 
+// Pending registration data = CreateUserInput + bookkeeping fields
+// that should NOT be passed to prisma.user.create()
+export interface PendingRegistrationData extends CreateUserInput {
+  emailOtpRequired: boolean;
+}
+
 export class AuthRepository {
   // ── User queries ─────────────────────────────────────────────────────────
 
@@ -61,7 +67,10 @@ export class AuthRepository {
 
   // ── Pending registration (Redis) ─────────────────────────────────────────
 
-  async savePendingRegistration(phoneNumber: string, data: CreateUserInput) {
+  async savePendingRegistration(
+    phoneNumber: string,
+    data: PendingRegistrationData,
+  ) {
     await redisClient.setEx(
       `pending:register:${phoneNumber}`,
       PENDING_TTL_SECONDS,
@@ -71,10 +80,10 @@ export class AuthRepository {
 
   async getPendingRegistration(
     phoneNumber: string,
-  ): Promise<CreateUserInput | null> {
+  ): Promise<PendingRegistrationData | null> {
     const raw = await redisClient.get(`pending:register:${phoneNumber}`);
     if (!raw) return null;
-    return JSON.parse(raw) as CreateUserInput;
+    return JSON.parse(raw) as PendingRegistrationData;
   }
 
   async clearPendingRegistration(phoneNumber: string) {

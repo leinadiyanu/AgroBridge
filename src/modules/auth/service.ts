@@ -29,7 +29,6 @@ interface RegisterVerifyInput {
   email: string;
   phoneOtp: string;
   emailOtp: string;
-  // We re-read the pending data from Redis so nothing sensitive sits in the request
 }
 
 interface LoginInitiateInput {
@@ -48,10 +47,9 @@ export class AuthService {
   // ── Register Step 1: validate + send OTPs ────────────────────────────────
 
   async registerInitiate(input: RegisterInitiateInput) {
-    const { phoneNumber, email, name, location, role, password } = input; //phoneNumber, name, location, ROLE, passwordHash
+    const { phoneNumber, email, name, location, role, password } = input;
 
     if (password.length < 8) {
-      //Must be greater than 8, Basic password length check. More complex rules can be added as needed.
       throw new AppError("Password must be at least 8 characters", 400);
     }
 
@@ -70,8 +68,50 @@ export class AuthService {
       }
     }
 
-    // Hash password and stash pending registration in Redis
     const passwordHash = await bcrypt.hash(password, 12);
+
+    // Generate OTPs
+    const phoneOtp = generateOtp();
+    const emailOtp = generateOtp();
+
+    // Phone is the primary, required channel.
+    const phoneResults = await Promise.allSettled([
+      saveOtp("phone", phoneNumber, phoneOtp),
+      sendSmsOtp(phoneNumber, phoneOtp),
+    ]);
+
+    const phoneFailed = phoneResults.some((r) => r.status === "rejected");
+    if (phoneFailed) {
+      phoneResults.forEach((r, i) => {
+        if (r.status === "rejected") {
+          console.error(`Phone OTP task ${i} failed:`, r.reason);
+        }
+      });
+      throw new AppError("Failed to send phone OTP. Please try again.", 500);
+    }
+
+    // Email is optional/secondary — a failure here must not block registration.
+    let emailOtpRequired = false;
+    if (email) {
+      const emailResults = await Promise.allSettled([
+        saveOtp("email", email, emailOtp),
+        sendEmailOtp(email, emailOtp),
+      ]);
+
+      const emailFailed = emailResults.some((r) => r.status === "rejected");
+      if (emailFailed) {
+        emailResults.forEach((r, i) => {
+          if (r.status === "rejected") {
+            console.error(`Email OTP task ${i} failed:`, r.reason);
+          }
+        });
+      } else {
+        emailOtpRequired = true;
+      }
+    }
+
+    // Save pending registration AFTER we know whether email OTP actually went out,
+    // so registerVerify can check the real delivery state, not just "was email present".
     await this.repo.savePendingRegistration(phoneNumber, {
       phoneNumber,
       email,
@@ -79,54 +119,30 @@ export class AuthService {
       location,
       role,
       passwordHash,
+      emailOtpRequired,
     });
 
-    // Generate and send OTPs
-    const phoneOtp = generateOtp();
-    const emailOtp = generateOtp();
-
-    const otpTasks = [
-      saveOtp("phone", phoneNumber, phoneOtp),
-      sendSmsOtp(phoneNumber, phoneOtp),
-    ];
-
-    // Only add email tasks if email was provided
-    if (email) {
-      otpTasks.push(
-        saveOtp("email", email, emailOtp),
-        sendEmailOtp(email, emailOtp),
-      );
-    }
-
-    await Promise.all(otpTasks);
     return {
+      phoneNumber,
       message: email
-        ? "OTPs sent to your phone number and email. They expire in 5 minutes."
+        ? emailOtpRequired
+          ? "OTPs sent to your phone number and email. They expire in 5 minutes."
+          : "OTP sent to your phone number. We couldn't send the email OTP right now, but you can continue with phone verification."
         : "OTP sent to your phone number. It expires in 5 minutes.",
-      channels: email ? ["phone", "email"] : ["phone"],
+      channels: emailOtpRequired ? ["phone", "email"] : ["phone"],
     };
   }
 
   // ── Register Step 2: verify OTPs + create account ────────────────────────
 
   async registerVerify(input: RegisterVerifyInput) {
-    const { phoneNumber, email, phoneOtp, emailOtp } = input;
+    const { phoneNumber, phoneOtp, emailOtp } = input;
 
-    // Always verify phone
     const phoneValid = await verifyOtp("phone", phoneNumber, phoneOtp);
     if (!phoneValid) {
       throw new AppError("Phone OTP is invalid or expired", 400);
     }
 
-    // Only verify email if it was provided
-    if (email) {
-      const emailValid = await verifyOtp("email", email, emailOtp);
-      if (!emailValid) {
-        throw new AppError("Email OTP is invalid or expired", 400);
-      }
-    }
-
-    // Retrieve pending registration data from Redis
     const pending = await this.repo.getPendingRegistration(phoneNumber);
     if (!pending) {
       throw new AppError(
@@ -135,8 +151,23 @@ export class AuthService {
       );
     }
 
-    // Generate tokens BEFORE creating user — so if this crashes, no broken user in DB
-    const user = await this.repo.createUser(pending);
+    // Only require email OTP if it was actually sent successfully during initiate —
+    // not based on whether the verify request happens to include an email field.
+    if (pending.emailOtpRequired) {
+      if (!pending.email) {
+        throw new AppError(
+          "Registration session is missing email data. Please start again.",
+          400,
+        );
+      }
+      const emailValid = await verifyOtp("email", pending.email, emailOtp);
+      if (!emailValid) {
+        throw new AppError("Email OTP is invalid or expired", 400);
+      }
+    }
+
+    const { emailOtpRequired, ...userData } = pending;
+    const user = await this.repo.createUser(userData);
 
     let accessToken: string;
     let refreshToken: string;
@@ -145,7 +176,6 @@ export class AuthService {
       accessToken = generateAccessToken(user.id, user.role);
       refreshToken = generateRefreshToken(user.id);
     } catch (err) {
-      // Token generation failed — roll back user creation
       await this.repo.deleteUser(user.id);
       throw new AppError("Account creation failed. Please try again.", 500);
     }
@@ -158,7 +188,6 @@ export class AuthService {
 
     await this.repo.clearPendingRegistration(phoneNumber);
 
-    // After registerVerify creates user
     await notificationService.notify({ type: "welcome", userId: user.id });
 
     return { user, accessToken, refreshToken };
