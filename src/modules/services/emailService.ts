@@ -1,5 +1,6 @@
 // src/services/email.service.ts — add general sendEmail
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -8,7 +9,7 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_APP_PASSWORD as string,
   },
   family: 4,
-});
+} as SMTPTransport.Options);
 
 export const sendEmailOtp = async (email: string, otp: string) => {
   await transporter.sendMail({
