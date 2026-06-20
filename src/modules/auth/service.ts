@@ -80,16 +80,31 @@ export class AuthService {
     const phoneOtp = generateOtp();
     const emailOtp = generateOtp();
 
-    const t3 = Date.now();
     const phoneTasksPromise = Promise.allSettled([
-      saveOtp("phone", phoneNumber, phoneOtp),
-      sendSmsOtp(phoneNumber, phoneOtp),
+      saveOtp("phone", phoneNumber, phoneOtp).then((r) => {
+        console.log(`[timing] saveOtp phone done`);
+        return r;
+      }),
+      (async () => {
+        const t = Date.now();
+        const r = await sendSmsOtp(phoneNumber, phoneOtp);
+        console.log(`[timing] sendSmsOtp: ${Date.now() - t}ms`);
+        return r;
+      })(),
     ]);
 
     const emailTasksPromise = email
       ? Promise.allSettled([
-          saveOtp("email", email, emailOtp),
-          sendEmailOtp(email, emailOtp),
+          saveOtp("email", email, emailOtp).then((r) => {
+            console.log(`[timing] saveOtp email done`);
+            return r;
+          }),
+          (async () => {
+            const t = Date.now();
+            const r = await sendEmailOtp(email, emailOtp);
+            console.log(`[timing] sendEmailOtp: ${Date.now() - t}ms`);
+            return r;
+          })(),
         ])
       : Promise.resolve(null);
 
