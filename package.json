@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/leinadiyanu/AgroBridge#readme",
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
@@ -49,6 +50,7 @@
     "axios": "^1.18.0",
     "bcrypt": "^6.0.0",
     "connect-redis": "^9.0.0",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "ioredis": "^5.11.0",
