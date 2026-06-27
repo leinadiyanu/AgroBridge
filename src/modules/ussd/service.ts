@@ -28,14 +28,19 @@ export class UssdService {
       // Inject profile location into session so postLocation can use it
       // const existingSession = await this.repo.getSession(phoneNumber);
       // if (!existingSession) {
-
       if (flowSteps.length === 0) {
         await this.repo.saveSession(phoneNumber, {
-          step: "menu",
+          step: "loginPin", // was "menu"
           data: { profileLocation: user.location, role: user.role },
         });
       }
-      
+      // if (flowSteps.length === 0) {
+      //   await this.repo.saveSession(phoneNumber, {
+      //     step: "menu",
+      //     data: { profileLocation: user.location, role: user.role },
+      //   });
+      // }
+
       // }
       const dashboardFlow = dashboardFlowFor(user.role);
       return this.engine.run(dashboardFlow, flowSteps, phoneNumber); // expand this later

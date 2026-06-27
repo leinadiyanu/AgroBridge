@@ -30,12 +30,7 @@ export class FlowEngine {
     const currentStepKey = session.step;
     const currentStep = flow.steps[currentStepKey];
 
-    // console.log("Latest Input:", latestInput);
-    // console.log("Current Step Key:", currentStepKey);
-    // console.log("Current Step:", currentStep);
-
     if (!latestInput) {
-    //   console.log(Object.keys(flow.steps));
       return typeof currentStep.prompt === "function"
         ? currentStep.prompt(
             session.data.role,
@@ -62,9 +57,16 @@ export class FlowEngine {
         phoneNumber,
         latestInput,
         value,
+        flow, // ← added
       );
     }
 
+    // const nextKey =
+    //   typeof currentStep.next === "function"
+    //     ? currentStep.next(latestInput)
+    //     : currentStep.next;
+    // session.step = nextKey;
+    // const nextStep = flow.steps[nextKey];
     const nextKey =
       typeof currentStep.next === "function"
         ? currentStep.next(latestInput)
@@ -73,14 +75,30 @@ export class FlowEngine {
     const nextStep = flow.steps[nextKey];
 
     if (nextStep.action && !nextStep.validate) {
+      const autoValue = nextStep.transform
+        ? nextStep.transform(latestInput, session.data)
+        : value;
+      if (nextStep.saveAs) session.data[nextStep.saveAs] = autoValue;
       return this.executeAction(
         nextStep.action,
         session,
         phoneNumber,
         latestInput,
-        value,
+        autoValue,
+        flow,
       );
     }
+
+    // if (nextStep.action && !nextStep.validate) {
+    //   return this.executeAction(
+    //     nextStep.action,
+    //     session,
+    //     phoneNumber,
+    //     latestInput,
+    //     value,
+    //     flow, // ← added
+    //   );
+    // }
 
     await this.repo.saveSession(phoneNumber, session);
     if (nextStep.isTerminal) await this.repo.deleteSession(phoneNumber);
@@ -100,6 +118,7 @@ export class FlowEngine {
     phoneNumber: string,
     latestInput: string,
     value: string,
+    flow: any, // ← added
   ): Promise<string> {
     const handler = actionRegistry[action];
     if (!handler) {
@@ -112,6 +131,7 @@ export class FlowEngine {
       phoneNumber,
       latestInput,
       value,
+      flow, // ← added
     });
   }
 }
