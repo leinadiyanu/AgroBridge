@@ -13,6 +13,11 @@ export interface PredictInput {
 export interface PredictOutput {
   commodity: string;
   state: string;
+  unit: string;
+  current_price: number;
+  previous_price: number;
+  highest_price_recorded: number;
+  lowest_price_recorded: number;
   direction: string;
   advice: string;
 }

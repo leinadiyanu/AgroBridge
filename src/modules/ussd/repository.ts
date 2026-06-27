@@ -31,8 +31,9 @@ export class UssdRepository {
     await redisClient.del(`ussd:session:${phoneNumber}`);
   }
 
-  // ─── Prisma methods (unchanged) ──────────────────────────────────
+  // ─── Prisma methods ──────────────────────────────────
 
+  // ---User----
   async findUserByPhone(phoneNumber: string) {
     return prisma.user.findFirst({ where: { phoneNumber } });
   }
@@ -54,6 +55,46 @@ export class UssdRepository {
     return bcrypt.compare(pin, user.pin);
   }
 
+  async linkFarmerToAgent(data: { agentPhone: string; farmerPhone: string }) {
+    const [agent, farmer] = await Promise.all([
+      prisma.user.findUnique({ where: { phoneNumber: data.agentPhone } }),
+      prisma.user.findUnique({ where: { phoneNumber: data.farmerPhone } }),
+    ]);
+    if (!agent || !farmer) throw new Error("Agent or farmer not found");
+    return prisma.agentFarmer.create({
+      data: { agentId: agent.id, farmerId: farmer.id },
+    });
+  }
+
+  async getFarmersByAgentPhone(phoneNumber: string) {
+    const agent = await prisma.user.findUnique({
+      where: { phoneNumber },
+      include: { managedFarmers: { include: { farmer: true } } },
+    });
+    if (!agent) return [];
+    return agent.managedFarmers.map((af) => af.farmer);
+  }
+
+  async getAgentReportSummary(phoneNumber: string) {
+    const agent = await prisma.user.findUnique({ where: { phoneNumber } });
+    if (!agent) throw new Error("Agent not found");
+
+    const [transactions, farmerCount] = await Promise.all([
+      prisma.transaction.findMany({ where: { agentId: agent.id } }),
+      prisma.agentFarmer.count({ where: { agentId: agent.id } }),
+    ]);
+
+    const completed = transactions.filter((t) => t.status === "COMPLETED");
+    const totalFacilitated = completed.reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      farmerCount,
+      transactionCount: completed.length,
+      totalFacilitated,
+    };
+  }
+
+  // ---Listing----
   async createListing(data: {
     phoneNumber: string;
     crop: string;
@@ -62,7 +103,23 @@ export class UssdRepository {
     location: string;
     availableFrom: string;
   }) {
-    // prisma.listing.create(...)
+    const farmer = await prisma.user.findUnique({
+      where: { phoneNumber: data.phoneNumber },
+    });
+    if (!farmer) throw new Error("Farmer not found");
+
+    const [day, month, year] = data.availableFrom.split("/");
+    return prisma.listing.create({
+      data: {
+        farmerId: farmer.id,
+        crop: data.crop,
+        quantity: data.quantity,
+        price: data.price,
+        location: data.location,
+        availableFrom: new Date(`${year}-${month}-${day}`),
+        status: "ACTIVE",
+      },
+    });
   }
 
   async getListingsByCrop(crop: string): Promise<any[]> {
@@ -90,6 +147,62 @@ export class UssdRepository {
     return prisma.listing.update({ where: { id }, data: { status } });
   }
 
+  // ---Order----
+
+  async createOrder(data: {
+    buyerPhone: string;
+    listingId: string;
+    quantity: number;
+  }) {
+    const buyer = await prisma.user.findUnique({
+      where: { phoneNumber: data.buyerPhone },
+    });
+    if (!buyer) return { ok: false, message: "Buyer not found." };
+
+    const listing = await prisma.listing.findUnique({
+      where: { id: data.listingId },
+    });
+    if (!listing || listing.status !== "ACTIVE") {
+      return { ok: false, message: "Listing no longer available." };
+    }
+    if (data.quantity > listing.quantity) {
+      return { ok: false, message: `Only ${listing.quantity}kg available.` };
+    }
+
+    const totalPrice = data.quantity * listing.price;
+
+    const order = await prisma.order.create({
+      data: {
+        listingId: listing.id,
+        buyerId: buyer.id,
+        farmerId: listing.farmerId,
+        quantity: data.quantity,
+        totalPrice,
+        status: "PENDING",
+      },
+    });
+
+    return { ok: true, crop: listing.crop, totalPrice, orderId: order.id };
+  }
+
+  async getOrdersByBuyerPhone(phoneNumber: string) {
+    const buyer = await prisma.user.findUnique({ where: { phoneNumber } });
+    if (!buyer) return [];
+    return prisma.order.findMany({
+      where: { buyerId: buyer.id },
+      include: { listing: { select: { crop: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    });
+  }
+
+  async getOrderById(id: string) {
+    return prisma.order.findUnique({
+      where: { id },
+      include: { listing: { select: { crop: true } } },
+    });
+  }
+
   async getIncomingOrders(phoneNumber: string) {
     const user = await prisma.user.findUnique({ where: { phoneNumber } });
     if (!user) return [];
@@ -99,7 +212,7 @@ export class UssdRepository {
         listing: { select: { crop: true } },
         buyer: { select: { name: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { totalPrice: "desc" }, // best offer shows up first
       take: 3,
     });
   }
@@ -108,97 +221,151 @@ export class UssdRepository {
     return prisma.order.update({ where: { id }, data: { status } });
   }
 
-  async linkFarmerToAgent(data: { agentPhone: string; farmerPhone: string }) {
-    // prisma.agentFarmer.create(...)
+  async confirmOrder(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { listing: true, buyer: true },
+    });
+    if (!order || order.status !== "PENDING") {
+      return { ok: false, message: "Order no longer available." };
+    }
+    if (order.quantity > order.listing.quantity) {
+      return {
+        ok: false,
+        message: "Not enough stock left to fulfil this order.",
+      };
+    }
+
+    // No stock touched here — this just marks who the farmer picked.
+    // Other bidders stay PENDING, untouched, as a fallback.
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: "CONFIRMED" },
+    });
+
+    return {
+      ok: true,
+      crop: order.listing.crop,
+      quantity: order.quantity,
+      buyerName: order.buyer.name,
+    };
   }
 
+  async completeOrderPayment(orderId: string) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { listing: true },
+      });
+      if (!order || order.status !== "CONFIRMED") {
+        throw new Error("Order not in a payable state");
+      }
+      if (order.quantity > order.listing.quantity) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: "CANCELLED" },
+        });
+        throw new Error("STOCK_UNAVAILABLE"); // see Gap 2 below
+      }
+
+      const remaining = order.listing.quantity - order.quantity;
+
+      await tx.listing.update({
+        where: { id: order.listingId },
+        data: {
+          quantity: remaining,
+          status: remaining === 0 ? "SOLD" : order.listing.status,
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "COMPLETED" },
+      });
+
+      if (remaining === 0) {
+        await tx.order.updateMany({
+          where: {
+            listingId: order.listingId,
+            status: { in: ["PENDING", "CONFIRMED"] },
+            NOT: { id: orderId },
+          },
+          data: { status: "CANCELLED" },
+        });
+      }
+
+      const PLATFORM_FEE_RATE = 0.05; // swap for your real fee
+      const platformFee = order.totalPrice * PLATFORM_FEE_RATE;
+      const farmerPayout = order.totalPrice - platformFee;
+
+      await tx.transaction.create({
+        data: {
+          farmerId: order.farmerId,
+          buyerId: order.buyerId,
+          orderId: order.id,
+          amount: order.totalPrice,
+          platformFee,
+          farmerPayout,
+          status: "COMPLETED",
+        },
+      });
+    });
+  }
+
+  // ---Transaction----
+
   async createTransaction(data: {
-    agentPhone: string;
+    agentPhone?: string;
     farmerPhone: string;
     buyerPhone: string;
     amount: number;
+    orderId?: string;
   }) {
-    // prisma.transaction.create(...)
+    const [farmer, buyer, agent] = await Promise.all([
+      prisma.user.findUnique({ where: { phoneNumber: data.farmerPhone } }),
+      prisma.user.findUnique({ where: { phoneNumber: data.buyerPhone } }),
+      data.agentPhone
+        ? prisma.user.findUnique({ where: { phoneNumber: data.agentPhone } })
+        : Promise.resolve(null),
+    ]);
+
+    if (!farmer || !buyer) throw new Error("Farmer or buyer not found");
+    if (data.agentPhone && !agent) throw new Error("Agent not found");
+
+    return prisma.transaction.create({
+      data: {
+        farmerId: farmer.id,
+        buyerId: buyer.id,
+        agentId: agent?.id ?? null,
+        amount: data.amount,
+        orderId: data.orderId ?? null,
+      },
+    });
+  }
+
+  async getEarnings(phoneNumber: string) {
+    const farmer = await prisma.user.findUnique({ where: { phoneNumber } });
+    if (!farmer) throw new Error("Farmer not found");
+
+    const transactions = await prisma.transaction.findMany({
+      where: { farmerId: farmer.id },
+    });
+
+    const paidOut = transactions
+      .filter((t) => t.status === "COMPLETED")
+      .reduce((sum, t) => sum + t.farmerPayout, 0);
+
+    const pending = transactions
+      .filter((t) => t.status === "PENDING")
+      .reduce((sum, t) => sum + t.farmerPayout, 0);
+
+    return { total: paidOut + pending, pending, paidOut };
+  }
+
+  async expireStalePendingPayments() {
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000); // tune the window to taste
+    return prisma.order.updateMany({
+      where: { status: "CONFIRMED", updatedAt: { lt: cutoff } },
+      data: { status: "CANCELLED" },
+    });
   }
 }
-
-// async getTempUser(phoneNumber: string) {
-//   return prisma.tempUser.findUnique({
-//     where: { phoneNumber },
-//   });
-// }
-
-// async deleteTempUser(phoneNumber: string) {
-//   return prisma.tempUser.delete({
-//     where: { phoneNumber },
-//   });
-// }
-
-// /**
-//  * MAIN USER
-//  */
-// async getUser(phoneNumber: string) {
-//   return prisma.user.findUnique({
-//     where: { phoneNumber },
-//   });
-// }
-
-// async createUser(data: {
-//   phoneNumber: string;
-//   name: string;
-//   location: string;
-//   role: string;
-//   pin?: string;
-// }) {
-//   return prisma.user.create({
-//     data,
-//   });
-// }
-
-// async updateUser(
-//   phoneNumber: string,
-//   data: Partial<{
-//     name: string;
-//     location: string;
-//     role: string;
-//     pin: string;
-//   }>
-// ) {
-//   return prisma.user.update({
-//     where: { phoneNumber },
-//     data,
-//   });
-// }
-
-// /**
-//  * USSD REQUESTS (BUY/SELL)
-//  */
-// async createBuyRequest(data: {
-//   phoneNumber: string;
-//   crop: string;
-//   sessionId: string;
-// }) {
-//   return prisma.ussdRequest.create({
-//     data: {
-//       phoneNumber: data.phoneNumber,
-//       crop: data.crop,
-//       type: "BUY",
-//       sessionId: data.sessionId,
-//     },
-//   });
-// }
-
-// async createSellRequest(data: {
-//   phoneNumber: string;
-//   crop: string;
-//   sessionId: string;
-// }) {
-//   return prisma.ussdRequest.create({
-//     data: {
-//       phoneNumber: data.phoneNumber,
-//       crop: data.crop,
-//       type: "SELL",
-//       sessionId: data.sessionId,
-//     },
-//   });
-// }
